@@ -37,7 +37,7 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 | Newslettery | Plan wysyłek w kolumnach list (BOK obok MailerLite) z ostrzeżeniem o powtórzonym temacie w odstępie < 7 dni; tematy ze wspólnego Banku tematów (przeznaczenie: newsletter); grafiki w Bibliotece z tagiem „newsletter”; ręczne statystyki (otwarcia, kliknięcia, wypisania); listy z zasadami i wersjami wydań; wydania widoczne w Harmonogramie i alertach Dashboardu |
 | Brand Center | Pełny CRUD wszystkich zakładek |
 | Workspace | Akceptacje z filtrami, tablica zadań, komentarze, dziennik historii, powiadomienia w aplikacji |
-| Performance | Ręczne wyniki postów i obserwujących, mix filarów, raport miesięczny i kwartalny, kampanie z kreacjami i KPI, budżety |
+| Performance | Analityka: kafelki z objaśnieniami, wnioski wyliczone z danych, wykresy (zasięg, zaangażowanie, kanały, struktura interakcji), karta „Jak czytać ten ekran”; ręczne wyniki postów i obserwujących, mix filarów, raport miesięczny i kwartalny, kampanie z kreacjami i KPI, budżety |
 | Ustawienia | Marki, kanały z rytmem, nazwy ról, nazwy i kolory statusów, briefing, kopia JSON |
 
 ## Decyzje projektowe (odstępstwa i doprecyzowania specyfikacji)
@@ -58,6 +58,7 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 16. **Anulowane posty zostają przekreślone.** W Harmonogramie są domyślnie ukryte, przełącznik „Pokaż anulowane” (albo filtr statusu) pokazuje je przekreślone. Historia i dane zostają; usunięcie na stałe to osobna akcja „Usuń post”.
 17. **Wideo Content to osobny moduł** (dawniej zakładka Content Studio). Stary adres #/studio/wideo przekierowuje do nowego.
 18. **Czytelność:** tekst bazowy 16 px, minimum 12 px (poza znaczkami platform), ciemniejszy kolor tekstu pomocniczego. W kalendarzu duże miniatury, podsumowanie miesiąca i zwijana karta „Jak działa ta strona” (stan w ustawieniach: hideHowto).
+19. **Analityka tłumaczy liczby.** Domyślny okres to ostatnie 30 dni. Wnioski są liczone z danych (bez zewnętrznych norm branżowych), przy małej próbie lub małym zasięgu aplikacja ostrzega. Wyniki wpisuje się ręcznie albo przenosi z eksportu Meta Business Suite; rekord z `source` pokazuje źródło danych. Zapisanie obserwujących nie nadpisuje rekordów postów.
 11. **Kafelki pastelowe** (róż, szałwia, piasek, liliowy) to jedyne miejsce z kolorowym tłem: reszta interfejsu zostaje w bieli i beżu.
 
 ## Ograniczenia Etapu 1

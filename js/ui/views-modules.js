@@ -181,31 +181,159 @@
     const rows = R().list("pillars").map((p) => [p, counts[p.id] || 0]).concat(counts._none ? [[{ name: "Bez filaru", color: "#B7A6AF" }, counts._none]] : []);
     return rows.length ? rows.map(([p, n]) => `<div class="bar"><span>${esc(p.name)}</span><span>${n} (${U.pct(n / total)}${p.share != null ? `, cel ${p.share}%` : ""})</span><div class="track"><div class="fill" style="width:${(n / total) * 100}%;background:${p.color || "var(--wine)"}"></div></div></div>`).join("") : `<p class="muted small">Brak filarów.</p>`;
   }
+  /* ---------- Analityka: wykresy, wnioski i objaśnienia ---------- */
+  const GLOSS = [
+    ["Zasięg", "Ilu różnych ludzi zobaczyło post przynajmniej raz. Jedna osoba liczy się tylko raz."],
+    ["Wyświetlenia", "Ile razy post się wyświetlił. Jedna osoba mogła zobaczyć go kilka razy, więc ta liczba jest równa zasięgowi albo większa."],
+    ["Reakcje, komentarze, udostępnienia", "Co zrobili ludzie. Reakcja to polubienie lub inna reakcja, komentarz to odpowiedź pod postem, udostępnienie to przekazanie go dalej. Komentarze i udostępnienia świadczą o większym zainteresowaniu niż sama reakcja."],
+    ["Kliknięcia", "Wszystkie kliknięcia w post: w link, zdjęcie albo „Zobacz więcej”. To znak zainteresowania, ale nie to samo co wejścia na stronę."],
+    ["Zaangażowanie (ER)", "Z każdych 100 osób, które zobaczyły post, tyle zareagowało, skomentowało, udostępniło lub zapisało go. Wzór: (reakcje + komentarze + udostępnienia + zapisania) ÷ zasięg."],
+    ["Powtórzenia", "Wyświetlenia ÷ zasięg. Pokazuje, ile razy średnio ta sama osoba widziała post."],
+  ];
+  const READ_TIPS = [
+    "Porównuj z własną średnią, a nie z liczbami z internetu. Najważniejsze pytanie to: czy ten post poszedł lepiej czy gorzej niż nasz typowy.",
+    "Porównuj podobne rzeczy: ten sam kanał i podobny format (zdjęcie ze zdjęciem, film z filmem).",
+    "Strony różnej wielkości porównuj po zaangażowaniu (ER), nie po zasięgu. Większa strona ma większy zasięg z natury.",
+    "Zasięg mówi, do ilu osób dotarliśmy. ER mówi, czy treść ich zainteresowała. Kliknięcia mówią, czy chcieli dowiedzieć się więcej.",
+    "Kilka postów to orientacja, nie wyrok. Dopiero powtarzający się wzór z wielu tygodni coś znaczy.",
+    "Liczby to wartości łączne od publikacji posta do dnia pobrania danych, dlatego świeże posty mogą jeszcze rosnąć.",
+  ];
+  const num = (x) => Number(x) || 0;
+  const interOf = (r) => num(r.reactions) + num(r.comments) + num(r.shares) + num(r.saves);
+  const recOf = (v) => R().list("analytics", (a) => a.versionId === v.id)[0] || null;
+  const fmtPct = (x) => (x == null ? "brak" : U.pct(x));
+  function anRange(sel) {
+    const t = D.today();
+    if (!/^\d{4}-\d{2}$/.test(sel || "")) return { from: D.addDays(t, -29), to: t, label: "ostatnie 30 dni", prevFrom: D.addDays(t, -59), prevTo: D.addDays(t, -30), prevLabel: "poprzednie 30 dni", month: t.slice(0, 7) };
+    const pm = D.addMonths(sel, -1);
+    return { from: D.monthStart(sel), to: D.monthEnd(sel), label: D.monthLabel(sel), prevFrom: D.monthStart(pm), prevTo: D.monthEnd(pm), prevLabel: D.monthLabel(pm), month: sel };
+  }
+  /* Publikacje z wpisanymi wynikami (zasięg > 0) w zakresie dat. */
+  function anData(from, to) {
+    const items = R().list("versions", (v) => RL().inFilter(v) && v.status === "opublikowany" && v.date >= from && v.date <= to)
+      .map((v) => ({ v, r: recOf(v) })).filter((x) => x.r && num(x.r.reach) > 0)
+      .map((x) => ({ ...x, inter: interOf(x.r), er: interOf(x.r) / num(x.r.reach) }));
+    const sum = (k) => items.reduce((s, x) => s + num(x.r[k]), 0);
+    const reach = sum("reach"); const inter = items.reduce((s, x) => s + x.inter, 0);
+    return { items, reach, impressions: sum("impressions"), inter, clicks: sum("clicks"), reactions: sum("reactions"), comments: sum("comments"), shares: sum("shares"), saves: sum("saves"), er: reach ? inter / reach : null };
+  }
+  const groupBy = (items, keyFn) => { const m = new Map(); items.forEach((x) => { const k = keyFn(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return [...m.entries()]; };
+  const avgReach = (xs) => xs.reduce((s, x) => s + num(x.r.reach), 0) / (xs.length || 1);
+  const erOf = (xs) => { const r = xs.reduce((s, x) => s + num(x.r.reach), 0); return r ? xs.reduce((s, x) => s + x.inter, 0) / r : null; };
+  const fmtLabel = (f) => (f === "Reels" ? "Reels (filmy)" : f === "Post" ? "Posty ze zdjęciem" : f);
+
+  function insightsFor(d) {
+    const out = []; const items = d.items; if (!items.length) return out;
+    const title = (x) => `„${R().postTitle(x.v)}” (${R().chName(x.v.channelId)})`;
+    const byEr = items.slice().sort((a, b) => b.er - a.er); const best = byEr[0];
+    if (items.length > 1 && d.er) {
+      const tiny = num(best.r.reach) < (d.reach / items.length) * 0.5;
+      out.push(`Najwyższe zaangażowanie ma ${title(best)}: ${fmtPct(best.er)}, przy średniej ${fmtPct(d.er)} dla wszystkich postów. Czyli z 100 osób, które je zobaczyły, ${U.num(Math.round(best.er * 100))} wchodziło w interakcję.${tiny ? ` Uwaga: ten post dotarł tylko do ${U.num(best.r.reach)} osób, więc przy tak małej grupie wynik łatwo o przypadek.` : ""}`);
+    }
+    const byReach = items.slice().sort((a, b) => num(b.r.reach) - num(a.r.reach)); const top = byReach[0];
+    out.push(`Największy zasięg ma ${title(top)}: dotarł do ${U.num(top.r.reach)} osób (średnio na post: ${U.num(Math.round(d.reach / items.length))}).`);
+    const byClick = items.slice().sort((a, b) => num(b.r.clicks) - num(a.r.clicks))[0];
+    if (num(byClick.r.clicks) > 0) out.push(`Najwięcej kliknięć zebrał ${title(byClick)}: ${U.num(byClick.r.clicks)}. To znak, że treść chciano zobaczyć dokładniej.`);
+    const chans = groupBy(items, (x) => x.v.channelId);
+    if (chans.length > 1) out.push(`Kanały: ${chans.map(([id, xs]) => `${R().chName(id)}, średni zasięg ${U.num(Math.round(avgReach(xs)))}, zaangażowanie ${fmtPct(erOf(xs))}`).join("; ")}. Strony są różnej wielkości, dlatego uczciwie porównuje się zaangażowanie.`);
+    const fmts = groupBy(items, (x) => x.v.format);
+    if (fmts.length > 1) out.push(`Formaty: ${fmts.map(([f, xs]) => `${fmtLabel(f)}: ${xs.length} ${U.plural(xs.length, "post", "posty", "postów")}, średni zasięg ${U.num(Math.round(avgReach(xs)))}, zaangażowanie ${fmtPct(erOf(xs))}`).join("; ")}.`);
+    if (d.inter > 0) {
+      const share = (n) => U.pct(n / d.inter);
+      out.push(`Z ${U.num(d.inter)} interakcji ${share(d.reactions)} to reakcje, ${share(d.shares)} to udostępnienia, a komentarzy jest ${U.num(d.comments)}.${d.comments / d.inter < 0.05 ? " Komentarze to najrzadsza forma kontaktu: pytanie do odbiorców na końcu posta może to zmienić." : ""}`);
+    }
+    if (items.length < 20) out.push(`Uwaga: to ${items.length} ${U.plural(items.length, "post", "posty", "postów")}. Traktuj wnioski jako orientację, nie jako regułę.`);
+    return out;
+  }
+  const barRow = (label, sub, parts, valueHtml) => `<div class="abar"><div class="abar-l"><b>${esc(label)}</b><small>${esc(sub)}</small></div><div class="abar-t">${parts}</div><div class="abar-v">${valueHtml}</div></div>`;
+  const delta = (cur, prev, unit, hasPrev, fmt = U.num) => {
+    if (!hasPrev || !prev) return "";
+    const d = cur - prev; if (d === 0) return `bez zmian vs ${unit}`;
+    return `${d > 0 ? "▲ +" : "▼ "}${fmt(d)} vs ${unit}`;
+  };
+
   CT.views["performance/analityka"] = () => {
-    const V = "analityka"; const ym = U.filterVal(V, "m") || D.today().slice(0, 7);
-    const pub = R().list("versions", (v) => RL().inFilter(v) && v.status === "opublikowany" && v.date.startsWith(ym)).sort((a, b) => a.date.localeCompare(b.date));
-    const planned = R().list("versions", (v) => RL().inFilter(v) && v.status !== "anulowany" && v.date.startsWith(ym));
-    const rec = (v) => R().list("analytics", (a) => a.versionId === v.id)[0] || {};
-    const chs = R().list("channels", (c) => c.active !== false && (!RL().channelFilter() || c.id === RL().channelFilter()));
+    const V = "analityka"; const sel = U.filterVal(V, "m") || "30d"; const rg = anRange(sel);
+    const cur = anData(rg.from, rg.to); const prev = anData(rg.prevFrom, rg.prevTo); const hasPrev = prev.items.length > 0;
     const months = Array.from({ length: 12 }, (_, i) => D.addMonths(D.today().slice(0, 7), -i)).map((m) => [m, D.monthLabel(m)]);
-    return U.head("Analityka", "Wyniki wpisujesz ręcznie, np. z Meta Business Suite lub statystyk LinkedIna. Automatyczne pobieranie to Etap 3.")
-      + `<div class="filters"><label class="fsel"><span>Miesiąc</span><select data-filter="${V}.m">${months.map(([m, l]) => `<option value="${m}" ${m === ym ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>`
-      + `<section class="card"><h2>Wyniki publikacji <span class="cnt">${pub.length}</span></h2>${pub.length ? `<div class="tblwrap"><table class="tbl metrics"><thead><tr><th>Post</th>${METRICS.map(([, l]) => `<th>${l}</th>`).join("")}<th>ER</th><th></th></tr></thead><tbody>
-        ${pub.map((v) => { const r = rec(v); const er = RL().engagement(r);
+    const pubAll = R().list("versions", (v) => RL().inFilter(v) && v.status === "opublikowany" && v.date >= rg.from && v.date <= rg.to).sort((a, b) => a.date.localeCompare(b.date));
+    const planned = R().list("versions", (v) => RL().inFilter(v) && v.status !== "anulowany" && v.date >= rg.from && v.date <= rg.to);
+    const chs = R().list("channels", (c) => c.active !== false && (!RL().channelFilter() || c.id === RL().channelFilter()));
+    const src = cur.items.map((x) => x.r.source).find(Boolean);
+    const helpBtn = R().settings().hideAnHelp ? `<button class="btn ghost" data-act="anhelp-show">Jak czytać ten ekran</button>` : "";
+    const help = R().settings().hideAnHelp ? "" : `<section class="card explain"><div class="cardhead"><h2>Jak czytać ten ekran</h2><button class="btn small ghost" data-act="anhelp-hide">Ukryj</button></div>
+      <div class="explain-g"><div><h3>Co oznaczają liczby</h3><dl>${GLOSS.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join("")}</dl></div>
+      <div><h3>Jak je odczytywać</h3><ol>${READ_TIPS.map((t) => `<li>${esc(t)}</li>`).join("")}</ol></div></div></section>`;
+
+    let body;
+    if (!cur.items.length) {
+      body = `<div class="emptybox"><p>Brak wyników dla opublikowanych postów w okresie: ${esc(rg.label)}.</p><p class="small">Wyniki wpisz poniżej w sekcji „Wpisz lub popraw wyniki” (np. z Meta Business Suite). Wykresy pojawią się od razu.</p></div>`;
+    } else {
+      const items = cur.items;
+      const maxImp = Math.max(...items.map((x) => num(x.r.impressions) || num(x.r.reach)), 1);
+      const reachRows = items.slice().sort((a, b) => num(b.r.reach) - num(a.r.reach)).map((x) => barRow(R().postTitle(x.v), `${R().chName(x.v.channelId)}, ${D.fmtDay(x.v.date)}`,
+        `<div class="abar-f imp" style="width:${(num(x.r.impressions || x.r.reach) / maxImp) * 100}%"></div><div class="abar-f reach" style="width:${(num(x.r.reach) / maxImp) * 100}%"></div>`,
+        `<b>${U.num(x.r.reach)}</b><small>${U.num(x.r.impressions)} wyśw.</small>`)).join("");
+      const maxEr = Math.max(...items.map((x) => x.er), 0.0001); const avgPos = cur.er != null ? (cur.er / maxEr) * 100 : null;
+      const erRows = items.slice().sort((a, b) => b.er - a.er).map((x) => barRow(R().postTitle(x.v), `${R().chName(x.v.channelId)}, ${D.fmtDay(x.v.date)}`,
+        `<div class="abar-f er${cur.er != null && x.er >= cur.er ? " above" : ""}" style="width:${(x.er / maxEr) * 100}%"></div>${avgPos != null ? `<i class="abar-avg" style="left:${Math.min(avgPos, 100)}%" title="Średnia: ${fmtPct(cur.er)}"></i>` : ""}`,
+        `<b>${fmtPct(x.er)}</b><small>${U.num(x.inter)} interakcji</small>`)).join("");
+      const chanCards = groupBy(items, (x) => x.v.channelId).map(([id, xs]) => { const c = R().get("channels", id); return `<div class="achan" style="--c:${(c && c.color) || "var(--wine)"}"><div class="achan-h">${U.chTag(c)}<span class="muted small">${xs.length} ${U.plural(xs.length, "post", "posty", "postów")}</span></div>
+        <div class="achan-n"><div><b>${U.num(Math.round(avgReach(xs)))}</b><span>średni zasięg</span></div><div><b>${fmtPct(erOf(xs))}</b><span>zaangażowanie</span></div><div><b>${U.num(xs.reduce((s, x) => s + num(x.r.clicks), 0))}</b><span>kliknięcia</span></div></div></div>`; }).join("");
+      const segs = [["Reakcje", cur.reactions, "var(--wine)"], ["Komentarze", cur.comments, "var(--warn)"], ["Udostępnienia", cur.shares, "var(--ok)"], ["Zapisania", cur.saves, "var(--mauve)"]].filter(([, n]) => n > 0);
+      const segTotal = segs.reduce((s, [, n]) => s + n, 0) || 1;
+      const struct = segs.length ? `<div class="astack" role="img" aria-label="Struktura interakcji">${segs.map(([l, n, c]) => `<span style="width:${(n / segTotal) * 100}%;background:${c}" title="${l}: ${n}"></span>`).join("")}</div>
+        <ul class="alegend">${segs.map(([l, n, c]) => `<li><i style="background:${c}"></i>${l}: <b>${U.num(n)}</b> (${U.pct(n / segTotal)})</li>`).join("")}</ul>` : `<p class="muted small">Brak interakcji do pokazania.</p>`;
+      const ins = insightsFor(cur);
+      body = `<div class="akpis">
+          <div class="akpi"><b>${U.num(cur.reach)}</b><span>Łączny zasięg</span><p>Suma osób z poszczególnych postów. Ta sama osoba mogła zobaczyć kilka postów.</p><small>${esc(delta(cur.reach, prev.reach, rg.prevLabel, hasPrev))}</small></div>
+          <div class="akpi"><b>${U.num(cur.impressions)}</b><span>Wyświetlenia</span><p>Ile razy łącznie wyświetlono posty. Średnio ${cur.reach ? (cur.impressions / cur.reach).toFixed(1).replace(".", ",") : "brak"} razy na osobę.</p><small>${esc(delta(cur.impressions, prev.impressions, rg.prevLabel, hasPrev))}</small></div>
+          <div class="akpi"><b>${U.num(cur.inter)}</b><span>Interakcje</span><p>Reakcje, komentarze, udostępnienia i zapisania razem. Kliknięcia: ${U.num(cur.clicks)}.</p><small>${esc(delta(cur.inter, prev.inter, rg.prevLabel, hasPrev))}</small></div>
+          <div class="akpi accent"><b>${fmtPct(cur.er)}</b><span>Zaangażowanie (ER)</span><p>Z 100 osób, które zobaczyły posty, tyle wchodziło w interakcję. Liczone z sumy, nie ze średniej z postów.</p><small>${esc(delta(cur.er, prev.er, rg.prevLabel, hasPrev && prev.er != null, (d) => (Math.abs(d) * 100).toFixed(1).replace(".", ",") + " p.p."))}</small></div>
+        </div>
+        <section class="card"><h2>Wnioski w skrócie</h2><ul class="insights">${ins.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></section>
+        <div class="agrid">
+          <section class="card"><h2>Ilu osobom pokazał się każdy post</h2><p class="muted small">Ciemny słupek to zasięg (osoby), jasny to wyświetlenia (razy). Im większa różnica, tym częściej ta sama osoba widziała post.</p>
+            <div class="alegend inline"><span><i style="background:var(--wine)"></i>Zasięg</span><span><i style="background:color-mix(in srgb, var(--wine) 28%, var(--card))"></i>Wyświetlenia</span></div><div class="abars">${reachRows}</div></section>
+          <section class="card"><h2>Który post zainteresował najbardziej</h2><p class="muted small">Zaangażowanie (ER) każdego posta. Pionowa kreska to średnia wszystkich postów${cur.er != null ? ` (${fmtPct(cur.er)})` : ""}. Słupki powyżej średniej są wyróżnione.</p>
+            <div class="abars">${erRows}</div></section>
+        </div>
+        <div class="agrid">
+          <section class="card"><h2>Porównanie kanałów</h2><p class="muted small">Różnej wielkości strony porównuj po zaangażowaniu, a nie po zasięgu.</p><div class="achans">${chanCards}</div></section>
+          <section class="card"><h2>Co robili odbiorcy</h2><p class="muted small">Struktura interakcji (bez kliknięć). Pokazuje, czy ludzie tylko reagują, czy też komentują i udostępniają.</p>${struct}</section>
+        </div>`;
+    }
+
+    const rec = (v) => recOf(v) || {};
+    const editTable = pubAll.length ? `<div class="tblwrap"><table class="tbl metrics"><thead><tr><th>Post</th>${METRICS.map(([, l]) => `<th>${l}</th>`).join("")}<th>ER</th><th></th></tr></thead><tbody>
+        ${pubAll.map((v) => { const r = rec(v); const er = RL().engagement(r);
           return `<tr data-row="${v.id}"><td><a href="#/post/${v.postId}?v=${v.id}">${esc(R().postTitle(v))}</a><br><small class="muted">${esc(R().chName(v.channelId))}, ${D.fmtDay(v.date)}</small></td>
             ${METRICS.map(([k]) => `<td><input type="number" min="0" data-m="${k}" value="${r[k] ?? ""}" aria-label="${k}"></td>`).join("")}<td>${er != null ? U.pct(er) : "brak"}</td><td><button class="btn small" data-act="an-save" data-id="${v.id}">Zapisz</button></td></tr>`; }).join("")}
-        </tbody></table></div><p class="muted small">ER = (reakcje + komentarze + udostępnienia + zapisania) / zasięg.</p>` : `<p class="muted small">Brak potwierdzonych publikacji w tym miesiącu.</p>`}</section>`
-      + `<div class="grid2"><section class="card"><h2>Obserwujący na koniec miesiąca</h2>${chs.map((c) => { const r = R().list("analytics", (a) => a.channelId === c.id && a.period === ym)[0] || {};
-          return `<div class="inrow" data-row="${c.id}"><span>${U.chTag(c)}</span><input type="number" min="0" data-m="followers" value="${r.followers ?? ""}" aria-label="Obserwujący"><button class="btn small" data-act="an-fol" data-id="${c.id}" data-m="${ym}">Zapisz</button></div>`; }).join("")}</section>
-        <section class="card"><h2>Mix filarów</h2><p class="muted small">Posty zaplanowane w miesiącu (bez anulowanych): ${planned.length}</p>${pillarMix(planned)}</section></div>`;
+        </tbody></table></div><p class="muted small">ER = (reakcje + komentarze + udostępnienia + zapisania) / zasięg.</p>` : `<p class="muted small">Brak potwierdzonych publikacji w tym okresie.</p>`;
+    const resultsTable = cur.items.length ? `<section class="card"><h2>Wyniki każdego posta <span class="cnt">${cur.items.length}</span></h2><div class="tblwrap"><table class="tbl"><thead><tr><th>Post</th><th>Zasięg</th><th>Wyświetlenia</th><th>Reakcje</th><th>Komentarze</th><th>Udostępnienia</th><th>Kliknięcia</th><th>ER</th></tr></thead><tbody>
+        ${cur.items.slice().sort((a, b) => a.v.date.localeCompare(b.v.date)).map((x) => `<tr><td><a href="#/post/${x.v.postId}?v=${x.v.id}"><b>${esc(R().postTitle(x.v))}</b></a><br><small class="muted">${esc(R().chName(x.v.channelId))}, ${D.fmtDay(x.v.date)}</small></td>
+          <td>${U.num(x.r.reach)}</td><td>${U.num(x.r.impressions)}</td><td>${U.num(x.r.reactions)}</td><td>${U.num(x.r.comments)}</td><td>${U.num(x.r.shares)}</td><td>${U.num(x.r.clicks)}</td><td><b>${fmtPct(x.er)}</b></td></tr>`).join("")}
+        </tbody></table></div></section>` : "";
+
+    return U.head("Analityka", "Wyniki opublikowanych postów w czytelnej formie. Liczby wpisujesz ręcznie, np. z Meta Business Suite lub statystyk LinkedIna. Automatyczne pobieranie to Etap 3.", helpBtn)
+      + help
+      + `<div class="filters"><label class="fsel"><span>Okres</span><select data-filter="${V}.m"><option value="30d" ${sel === "30d" || !/^\d{4}-\d{2}$/.test(sel) ? "selected" : ""}>Ostatnie 30 dni</option>${months.map(([m, l]) => `<option value="${m}" ${m === sel ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>`
+      + (src ? `<p class="muted small asrc">Źródło danych: ${esc(src)}. To wartości łączne od publikacji do dnia pobrania danych.</p>` : "")
+      + body + resultsTable
+      + `<details class="card editres"${cur.items.length ? "" : " open"}><summary><h2>Wpisz lub popraw wyniki</h2></summary>${editTable}</details>`
+      + `<div class="grid2"><section class="card"><h2>Obserwujący na koniec miesiąca</h2><p class="muted small">Miesiąc: ${esc(D.monthLabel(rg.month))}</p>${chs.map((c) => { const r = R().list("analytics", (a) => a.channelId === c.id && a.period === rg.month && !a.versionId && a.followers != null)[0] || {};
+          return `<div class="inrow" data-row="${c.id}"><span>${U.chTag(c)}</span><input type="number" min="0" data-m="followers" value="${r.followers ?? ""}" aria-label="Obserwujący"><button class="btn small" data-act="an-fol" data-id="${c.id}" data-m="${rg.month}">Zapisz</button></div>`; }).join("")}</section>
+        <section class="card"><h2>Mix filarów</h2><p class="muted small">Posty w okresie „${esc(rg.label)}” (bez anulowanych): ${planned.length}</p>${pillarMix(planned)}</section></div>`;
   };
+  CT.actions["anhelp-hide"] = () => R().setSettings({ hideAnHelp: true });
+  CT.actions["anhelp-show"] = () => R().setSettings({ hideAnHelp: false });
   CT.actions["an-save"] = (el) => {
     const row = el.closest("[data-row]"); const vals = {};
     row.querySelectorAll("[data-m]").forEach((i) => { vals[i.dataset.m] = i.value === "" ? null : Number(i.value); });
     const v = R().get("versions", el.dataset.id);
     R().upsertAnalytics({ versionId: v.id }, { ...vals, channelId: v.channelId, period: v.date.slice(0, 7) }); U.toast("Zapisano wyniki.");
   };
-  CT.actions["an-fol"] = (el) => { const i = el.closest("[data-row]").querySelector("[data-m]"); R().upsertAnalytics({ channelId: el.dataset.id, period: el.dataset.m }, { followers: i.value === "" ? null : Number(i.value) }); U.toast("Zapisano liczbę obserwujących."); };
+  CT.actions["an-fol"] = (el) => { const i = el.closest("[data-row]").querySelector("[data-m]"); R().upsertAnalytics({ channelId: el.dataset.id, period: el.dataset.m, versionId: undefined }, { followers: i.value === "" ? null : Number(i.value) }); U.toast("Zapisano liczbę obserwujących."); };
 
   function reportData(range, brand) {
     const [a, b] = range;

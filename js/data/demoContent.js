@@ -16,6 +16,9 @@
     ["brodzik-nie-musi-byc-bialy", "Brodzik nie musi być biały", "br_l360", "ch_l360_fb", 759, 1350, 98925],
     ["estetyka-konstrukcja", "Estetyka zaczyna się od konstrukcji", "br_schedpol", "", 1200, 900, 119984],
   ];
+  /* Wyniki z eksportu Meta Business Suite (26.10-24.11.2026), wartości łączne od publikacji. Klucz: numer wiersza arkusza.
+     Kolejność: zasięg, wyświetlenia, reakcje, komentarze, udostępnienia, kliknięcia. */
+  const STATS = { 2: [524, 1149, 16, 0, 8, 12], 3: [569, 971, 18, 0, 4, 6], 4: [779, 1595, 23, 1, 7, 36], 5: [406, 684, 11, 0, 3, 11], 6: [153, 354, 6, 0, 1, 8], 7: [372, 529, 13, 0, 4, 1], 8: [118, 238, 5, 0, 1, 0], 9: [60, 120, 4, 0, 1, 1], 10: [278, 357, 5, 0, 1, 2], 11: [336, 751, 6, 0, 3, 5] };
   const CH = { "Schedpol Facebook": "ch_sp_fb", "Łazienka360 Facebook": "ch_l360_fb", "Schedpol Instagram": "ch_sp_ig", "Schedpol LinkedIn": "ch_sp_li" };
   const ST = { "szkic": "szkic", "w przygotowaniu": "w_przygotowaniu", "do akceptacji": "do_akceptacji", "poprawki": "poprawki", "zatwierdzony": "zatwierdzony", "zaplanowany": "zaplanowany", "opublikowany": "opublikowany", "anulowany": "anulowany" };
   const pillarOf = (t) => (/Lista zakupów/.test(t) ? "pl_3" : /Strefa prysznica|Brodzik nie musi/.test(t) ? "pl_2" : "pl_1");
@@ -59,6 +62,8 @@
         if (r.link) v.history.push(hist("link_publikacji", "Dodano link do publikacji", at, null, r.link));
       }
       db.versions.push(v);
+      const s = STATS[r.row];
+      if (s) db.analytics.push(base({ id: "an_dm_" + r.row, versionId: v.id, channelId: chId, period: date.slice(0, 7), reach: s[0], impressions: s[1], reactions: s[2], comments: s[3], shares: s[4], clicks: s[5], saves: null, source: "eksport Meta Business Suite z 26.10 do 24.11.2026" }));
       if (status === "poprawki" && r.comment) {
         db.comments.push(base({ id: "cm_dm_" + r.row, versionId: v.id, parentId: null, target: "inne", author: "Przełożony", role: "przelozony", text: r.comment, at: now, resolved: false, resolvedAt: null }));
       }
