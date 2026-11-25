@@ -107,3 +107,30 @@ CT.topicSeed = () => {
   l("tpl_10", "Pytanie do doradcy: Q&A", "Zapytaj nas o wszystko, co dotyczy łazienki", "stories z naklejką „Zadaj pytanie”", "dowolne, odpowiedzi linkują do kategorii", P.poradniki, "Najczęstsze pytania zapisuj jako tematy kolejnych postów.");
   return out;
 };
+
+/* Lista tematów do kręcenia In-house (Schedpol): każdy temat trafia i do Banku tematów (social media), i do Wideo Content (tor In-house).
+   Dodawane jednorazowo przy starcie (flaga meta.inhouseSeeded); usunięte ręcznie nie wracają. */
+CT.inhouseSeed = (videoStatus) => {
+  const now = CT.dates.nowISO();
+  const FB = "ch_sp_fb", IG = "ch_sp_ig";
+  const P = { produkt: "pl_1", inspiracje: "pl_2", poradniki: "pl_3" };
+  const list = [
+    ["Jedna maskownica, dwa wykończenia (gładka/pod płytkę)", P.produkt],
+    ["Co jest w środku odpływu?", P.produkt],
+    ["Base, Slim czy Slit – który odpływ będzie idealny dla Ciebie?", P.poradniki],
+    ["8 wykończeń maskownicy. Który wybierasz?", P.inspiracje],
+    ["Maskownica szczotkowana czy z połyskiem? Pokazanie różnic z bliska", P.produkt],
+    ["Łazienka bez barier bez kucia posadzki – najazdy do brodzików", P.poradniki],
+    ["Kolor brodzika – jakie kolory i struktury mamy dostępne.", P.inspiracje],
+  ];
+  const note = "Z listy tematów do kręcenia In-House.";
+  const topics = list.map(([title, pillarId], i) => ({
+    id: "tps_v" + (i + 1), createdAt: now, updatedAt: now, title, description: "", hook: "", goal: "", pillarId, brandId: "br_schedpol", channelIds: [FB, IG],
+    targets: ["social"], nlListIds: [], priority: "sredni", status: "nowy", notes: note, assetIds: [], postIds: [], nlIds: [],
+  }));
+  const videos = list.map(([title], i) => ({
+    id: "vd_seed_" + (i + 1), createdAt: now, updatedAt: now, track: "inhouse", title, hook: "", description: "", goal: "", location: "", people: "", props: "", shots: "", script: "",
+    brandId: "br_schedpol", status: videoStatus || "Pomysł", format: "Reels", ratio: "9:16", owner: "smm", due: "", channelIds: [FB, IG], assetIds: [], postId: "", notes: note,
+  }));
+  return { topics, videos };
+};

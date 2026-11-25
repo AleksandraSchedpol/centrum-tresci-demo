@@ -60,6 +60,7 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 18. **Czytelność:** tekst bazowy 16 px, minimum 12 px (poza znaczkami platform), ciemniejszy kolor tekstu pomocniczego. W kalendarzu duże miniatury, podsumowanie miesiąca i zwijana karta „Jak działa ta strona” (stan w ustawieniach: hideHowto).
 19. **Analityka tłumaczy liczby.** Domyślny okres to ostatnie 30 dni. Wnioski są liczone z danych (bez zewnętrznych norm branżowych), przy małej próbie lub małym zasięgu aplikacja ostrzega. Wyniki wpisuje się ręcznie albo przenosi z eksportu Meta Business Suite; rekord z `source` pokazuje źródło danych. Zapisanie obserwujących nie nadpisuje rekordów postów.
 20. **Dashboard to ekran decyzji, nie raport.** Jedno zdanie podsumowania liczone z danych, krótka lista rzeczy do zrobienia z plakietką rodzaju (po terminie, poprawki, do publikacji, akceptacja, uzupełnij, zadanie, luka w rytmie) i przyciskiem „Otwórz”. Powitanie bez imienia (pole z imieniem możliwe później).
+21. **Lista tematów do kręcenia In-House** (7 tematów) jest dodawana jednorazowo do Wideo Content (tor In-house, status „Pomysł”) i do Banku tematów (social media), flaga `meta.inhouseSeeded`. Usunięte ręcznie nie wracają, własne wpisy zostają nietknięte.
 11. **Kafelki pastelowe** (róż, szałwia, piasek, liliowy) to jedyne miejsce z kolorowym tłem: reszta interfejsu zostaje w bieli i beżu.
 
 ## Ograniczenia Etapu 1

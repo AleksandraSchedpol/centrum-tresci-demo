@@ -53,6 +53,13 @@ CT.repo = (() => {
       seed.formats.forEach((x) => { if (!db.formats.some((f) => f.id === x.id)) db.formats.push(x); });
       db.meta.nlSeeded = true;
     }
+    /* Tematy do kręcenia In-House: jednorazowo, bez duplikatów (po id). */
+    if (!db.meta.inhouseSeeded && CT.inhouseSeed) {
+      const seed = CT.inhouseSeed((db.settings.videoStatuses || [])[0]);
+      seed.topics.forEach((x) => { if (!db.topics.some((t) => t.id === x.id)) db.topics.push(x); });
+      seed.videos.forEach((x) => { if (!db.videos.some((v) => v.id === x.id)) db.videos.push(x); });
+      db.meta.inhouseSeeded = true;
+    }
     if (!db.meta.topicsSeeded && CT.topicSeed) {
       CT.topicSeed().forEach((x) => { if (!db.topics.some((t) => t.id === x.id)) db.topics.push(x); });
       db.meta.topicsSeeded = true;
