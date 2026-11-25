@@ -19,6 +19,22 @@
   /* Wyniki z eksportu Meta Business Suite (26.10-24.11.2026), wartości łączne od publikacji. Klucz: numer wiersza arkusza.
      Kolejność: zasięg, wyświetlenia, reakcje, komentarze, udostępnienia, kliknięcia. */
   const STATS = { 2: [524, 1149, 16, 0, 8, 12], 3: [569, 971, 18, 0, 4, 6], 4: [779, 1595, 23, 1, 7, 36], 5: [406, 684, 11, 0, 3, 11], 6: [153, 354, 6, 0, 1, 8], 7: [372, 529, 13, 0, 4, 1], 8: [118, 238, 5, 0, 1, 0], 9: [60, 120, 4, 0, 1, 1], 10: [278, 357, 5, 0, 1, 2], 11: [336, 751, 6, 0, 3, 5] };
+  /* Newslettery BOK (grafiki z folderu demo-materialy). Dzień względem dnia pierwszej wizyty. Teksty to streszczenie tego, co jest na grafice.
+     Wyników wysyłek (otwarcia, kliknięcia) celowo nie wpisano. */
+  const NL = [
+    { key: "nl-base-range", name: "Newsletter BOK: Odpływy Base Range (Rabatówka)", brand: "br_schedpol", day: -15, status: "wyslany", topicId: "tpn_bok1", w: 1414, h: 2000, bytes: 373962,
+      title: "Odpływy liniowe Base Range: Rabatówka", link: "",
+      content: "Promocja Rabatówka do 28.02.2027, rabaty do −60%.\nJedna baza, 8 wykończeń maskownic. Bazę i maskownicę dobiera się osobno.\nDługości 60–120 cm (co 10 cm), maskownica 2w1: pełna lub pod płytkę. Regulowane nóżki: pion i poziom.\nMarkowy syfon w zestawie z możliwością czyszczenia mechanicznego. Możliwość wykonania odpływu na konkretny wymiar.\n15 lat gwarancji. Dostępność potwierdza Biuro Obsługi Klienta." },
+    { key: "nl-nosniki", name: "Newsletter BOK: Nośniki do wanien", brand: "br_schedpol", day: -8, status: "wyslany", topicId: "tpn_bok2", w: 1414, h: 2000, bytes: 336523,
+      title: "Nośniki do wanien: szybki montaż bez stelaża i murowania", link: "",
+      content: "Pełne podparcie dna i rantów wanny, na całej powierzchni.\nSzczelność: bez kotew i wierceń, nie przerywa hydroizolacji.\nKomfort: izolacja akustyczna i termiczna, odporność na wilgoć. System łatwego łączenia elementów, montaż bez nóżek.\nPod płytki: oklejanie bezpośrednio na nośniku. Opcja LED z fabrycznym podcięciem.\n31 lat gwarancji. Możliwość wykonania nośnika na konkretny wymiar." },
+    { key: "nl-schedpol-stany", name: "Newsletter BOK: schedpol.pl, podgląd stanów magazynowych", brand: "br_schedpol", day: -2, status: "wyslany", topicId: "", w: 1414, h: 2000, bytes: 257918,
+      title: "Nowość na schedpol.pl: szybki podgląd stanów magazynowych", link: "https://schedpol.pl",
+      content: "Nowy filtr „Dostępność”: jednym kliknięciem tylko modele dostępne od ręki.\nStatus nad zdjęciem: dostępność i liczba rozmiarów w danym modelu. Dostępny rozmiar jest oznaczony zieloną kropką.\nStany magazynowe odświeżają się codziennie o godz. 8:00.\nPrzed złożeniem zamówienia potwierdź aktualny stan u swojego opiekuna BOK." },
+    { key: "nl-schedline-stany", name: "Newsletter BOK: schedline.pl, podgląd stanów magazynowych", brand: "br_schedline", day: 0, status: "gotowy", topicId: "", w: 1414, h: 2000, bytes: 245242,
+      title: "Nowość na schedline.pl: szybki podgląd stanów magazynowych", link: "https://schedline.pl",
+      content: "Nowy filtr „Dostępność”: jednym kliknięciem tylko modele dostępne od ręki.\nStatus nad zdjęciem: dostępność i liczba rozmiarów w danym modelu. Dostępny rozmiar jest oznaczony zieloną kropką.\nStany magazynowe odświeżają się codziennie o godz. 8:00.\nPrzed złożeniem zamówienia potwierdź aktualny stan u swojego opiekuna BOK." },
+  ];
   const CH = { "Schedpol Facebook": "ch_sp_fb", "Łazienka360 Facebook": "ch_l360_fb", "Schedpol Instagram": "ch_sp_ig", "Schedpol LinkedIn": "ch_sp_li" };
   const ST = { "szkic": "szkic", "w przygotowaniu": "w_przygotowaniu", "do akceptacji": "do_akceptacji", "poprawki": "poprawki", "zatwierdzony": "zatwierdzony", "zaplanowany": "zaplanowany", "opublikowany": "opublikowany", "anulowany": "anulowany" };
   const pillarOf = (t) => (/Lista zakupów/.test(t) ? "pl_3" : /Strefa prysznica|Brodzik nie musi/.test(t) ? "pl_2" : "pl_1");
@@ -70,4 +86,23 @@
     });
     return db;
   };
+
+  /* Wydania newsletterów BOK dodawane jednorazowo po wczytaniu danych (także do już zapisanych danych demo), po wczytaniu list i tematów newslettera. */
+  CT.repo.onLoad(() => {
+    const R = CT.repo; const D = CT.dates;
+    if ((R.settings() || {}).demoNlSeeded || !R.get("nlLists", "nl_bok")) return;
+    const today = D.today();
+    NL.forEach((n, i) => {
+      if (!R.get("assets", "as_nl_" + n.key)) {
+        R.add("assets", { id: "as_nl_" + n.key, demo: true, name: n.name, src: "demo/img/" + n.key + ".jpg", type: "image", mime: "image/jpeg", size: n.bytes, width: n.w, height: n.h,
+          ratio: ratioLabel(n.w, n.h), orientation: "pionowa", brandId: n.brand, channelId: "", source: "in-house", description: "", tags: ["newsletter"], license: "Materiał własny (archiwalny)" }, "as");
+      }
+      if (R.get("newsletters", "nl_dm_" + (i + 1))) return;
+      const date = D.addDays(today, n.day);
+      const o = R.saveNewsletter(null, { id: "nl_dm_" + (i + 1), demo: true, listId: "nl_bok", title: n.title, variant: "", date, status: n.status, audience: "B2B", goal: "", subject: "", preheader: "",
+        content: n.content, cta: "", link: n.link, topicId: n.topicId, assetIds: ["as_nl_" + n.key], postIds: [], notes: "" });
+      if (n.status === "wyslany") R.update("newsletters", o.id, { sentAt: new Date(`${date}T08:00:00+01:00`).toISOString() });
+    });
+    R.setSettings({ demoNlSeeded: true });
+  });
 })();

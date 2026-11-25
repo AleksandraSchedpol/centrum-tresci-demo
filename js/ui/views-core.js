@@ -27,6 +27,17 @@
     });
     R().list("tasks", (k) => k.due && k.due <= t && !["zakonczone", "anulowane"].includes(k.status) && RL().brandMatch(k.brandId))
       .forEach((k) => items.push({ kind: "task", title: k.title, reason: `Termin ${D.fmtDay(k.due)}${k.due < t ? " (po terminie)" : ""}`, route: `workspace/zadania?task=${k.id}`, date: k.due }));
+    /* Wydania newsletterów (tylko bez filtra kanału, tak jak wcześniej w alertach tygodnia). */
+    if (!RL().channelFilter()) {
+      R().list("newsletters", (n) => n.date && !["wyslany", "anulowany"].includes(n.status)).forEach((n) => {
+        const l = R().get("nlLists", n.listId) || {}; const nm = `${l.short || l.name || "Newsletter"}: ${n.title}`; const route = `newsletter/plan?nl=${n.id}`;
+        if (n.date < t) items.push({ kind: "late", label: "Newsletter", title: nm, reason: `Termin wysyłki minął (${D.fmtDay(n.date)}). Wyślij albo zmień datę`, route, date: n.date });
+        else if (n.date <= we) {
+          const ok = n.status === "gotowy";
+          items.push({ kind: ok ? "ready" : "issues", label: "Newsletter", title: nm, reason: ok ? `Gotowy do wysyłki, ${D.fmtDay(n.date)}` : `Status: ${U.label(CT.config.nlStatuses, n.status)}, wysyłka ${D.fmtDay(n.date)}`, route, date: n.date });
+        }
+      });
+    }
     const cf = RL().channelFilter(); let gaps = 0;
     R().list("channels", (c) => c.active !== false && (!cf || c.id === cf)).forEach((ch) => {
       const r = ch.rhythm || {};
@@ -39,7 +50,7 @@
     });
     return items.sort((a, b) => TODO_PRIO[a.kind] - TODO_PRIO[b.kind] || (a.date || "").localeCompare(b.date || ""));
   }
-  const todoRow = (it) => `<li><button class="todo todo-${it.kind}" data-route="${esc(it.route)}"><span class="todo-chip">${esc(TODO_LABEL[it.kind])}</span><span class="todo-t"><b>${esc(it.title)}</b><small>${esc(it.reason)}</small></span><span class="todo-go" aria-hidden="true">Otwórz →</span></button></li>`;
+  const todoRow = (it) => `<li><button class="todo todo-${it.kind}" data-route="${esc(it.route)}"><span class="todo-chip">${esc(it.label || TODO_LABEL[it.kind])}</span><span class="todo-t"><b>${esc(it.title)}</b><small>${esc(it.reason)}</small></span><span class="todo-go" aria-hidden="true">Otwórz →</span></button></li>`;
 
   CT.views["dashboard/start"] = () => {
     const t = D.today(); const ws = D.weekStart(t); const we = D.addDays(ws, 6);
