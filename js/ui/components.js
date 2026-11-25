@@ -200,8 +200,8 @@ CT.views = {};
   };
   U.tile = ({ tone, label, value, sub, key, on, chip: chipText }) => {
     const cf = CT.rules.channelFilter(); const ch = cf ? R().get("channels", cf) : null;
-    const chip = chipText ? `<span class="tchip">${esc(chipText)}</span>` : ch ? `<span class="tchip"><i class="cd" style="background:${ch.color}"></i>${esc(ch.name)}</span>` : `<span class="tchip">Wszystkie kanały</span>`;
-    return `<button class="ptile t-${tone}${on ? " on" : ""}" data-act="tile" data-k="${key}"><span class="tl">${esc(label)}</span>${chip}<b class="tv">${value}</b><small class="ts">${esc(sub || "")}</small></button>`;
+    const chip = chipText === false ? "" : chipText ? `<span class="tchip">${esc(chipText)}</span>` : ch ? `<span class="tchip"><i class="cd" style="background:${ch.color}"></i>${esc(ch.name)}</span>` : `<span class="tchip">Wszystkie kanały</span>`;
+    return `<button class="ptile t-${tone}${on ? " on" : ""}${chipText === false ? " nochip" : ""}" data-act="tile" data-k="${key}"><span class="tl">${esc(label)}</span>${chip}<b class="tv">${value}</b><small class="ts">${esc(sub || "")}</small></button>`;
   };
 
   /* --- elementy widoków --- */

@@ -24,7 +24,7 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 ## Stan modułów
 | Moduł | Stan w Etapie 1 |
 |---|---|
-| Dashboard, briefing | Kafelki (po terminie, do publikacji, akceptacje, opublikowane z porównaniem tygodnia). Działa na rzeczywistych danych. Briefing: widok i kopiowanie tekstu, bez wysyłki e-mail |
+| Dashboard, briefing | Powitanie z jednym zdaniem podsumowania, cztery kafelki (po terminie, do publikacji, do akceptacji, opublikowane), lista „Do zrobienia teraz” (maks. 5 pozycji, reszta po rozwinięciu), pasek tygodnia, najbliższe publikacje, najlepszy post z Analityki i mix filarów; ostatnie zmiany i aktywność kanałów w zwijanych sekcjach. Działa na rzeczywistych danych. Briefing: widok i kopiowanie tekstu, bez wysyłki e-mail |
 | Harmonogram | Kafelki (W toku, W tym tygodniu, Gotowe do publikacji, Opublikowane) jako szybkie filtry; widoki Miesiąc, Tydzień, Lista i Pipeline; drag & drop postów (z historią dat) i tematów; ostrzeżenia rytmu; okazje w kalendarzu |
 | Pipeline | Kolumny według statusu. Przeciągnięcie wykonuje krok procesu z uprawnieniami roli: SMM wysyła do akceptacji, oznacza zaplanowany i publikuje; Przełożony zatwierdza i zgłasza poprawki |
 | Wyszukiwarka | Pole w górnym pasku (Ctrl+K): posty i treści wersji, tematy, materiały, wideo, zadania, kampanie, okazje, konkurencja |
@@ -59,6 +59,7 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 17. **Wideo Content to osobny moduł** (dawniej zakładka Content Studio). Stary adres #/studio/wideo przekierowuje do nowego.
 18. **Czytelność:** tekst bazowy 16 px, minimum 12 px (poza znaczkami platform), ciemniejszy kolor tekstu pomocniczego. W kalendarzu duże miniatury, podsumowanie miesiąca i zwijana karta „Jak działa ta strona” (stan w ustawieniach: hideHowto).
 19. **Analityka tłumaczy liczby.** Domyślny okres to ostatnie 30 dni. Wnioski są liczone z danych (bez zewnętrznych norm branżowych), przy małej próbie lub małym zasięgu aplikacja ostrzega. Wyniki wpisuje się ręcznie albo przenosi z eksportu Meta Business Suite; rekord z `source` pokazuje źródło danych. Zapisanie obserwujących nie nadpisuje rekordów postów.
+20. **Dashboard to ekran decyzji, nie raport.** Jedno zdanie podsumowania liczone z danych, krótka lista rzeczy do zrobienia z plakietką rodzaju (po terminie, poprawki, do publikacji, akceptacja, uzupełnij, zadanie, luka w rytmie) i przyciskiem „Otwórz”. Powitanie bez imienia (pole z imieniem możliwe później).
 11. **Kafelki pastelowe** (róż, szałwia, piasek, liliowy) to jedyne miejsce z kolorowym tłem: reszta interfejsu zostaje w bieli i beżu.
 
 ## Ograniczenia Etapu 1

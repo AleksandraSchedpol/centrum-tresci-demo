@@ -252,6 +252,7 @@
     return `${d > 0 ? "▲ +" : "▼ "}${fmt(d)} vs ${unit}`;
   };
 
+  U.pillarMix = pillarMix; /* używane też na Dashboardzie */
   CT.views["performance/analityka"] = () => {
     const V = "analityka"; const sel = U.filterVal(V, "m") || "30d"; const rg = anRange(sel);
     const cur = anData(rg.from, rg.to); const prev = anData(rg.prevFrom, rg.prevTo); const hasPrev = prev.items.length > 0;

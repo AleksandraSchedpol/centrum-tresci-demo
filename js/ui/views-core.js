@@ -5,53 +5,125 @@
   const RL = () => CT.rules;
 
   /* ================= DASHBOARD ================= */
+  /* Ekran startowy: jedno zdanie podsumowania, cztery liczby, krótka lista „do zrobienia teraz”, pasek tygodnia i najbliższe publikacje.
+     Szczegóły (stare listy alertów, ostatnie zmiany) są niżej, w zwijanych sekcjach. */
+  const TODO_PRIO = { late: 0, fixes: 1, ready: 2, approval: 3, issues: 4, task: 5, gap: 6 };
+  const TODO_LABEL = { late: "Po terminie", fixes: "Poprawki", ready: "Do publikacji", approval: "Akceptacja", issues: "Uzupełnij", task: "Zadanie", gap: "Luka w rytmie" };
+  const FEED_DOW = (d) => D.DOWS[(D.dow(d) + 6) % 7];
+
+  /* Lista rzeczy wymagających działania: jedna pozycja na wersję posta (najpilniejsza przyczyna), potem zadania i luki w rytmie. */
+  function dashTodo(t, ws, we) {
+    const role = R().role(); const items = [];
+    const where = (v) => `${R().chName(v.channelId)}, ${D.fmtDay(v.date)}${v.time ? " " + v.time : ""}`;
+    R().list("versions", (v) => RL().inFilter(v) && !RL().FINAL.includes(v.status)).forEach((v) => {
+      const ds = RL().displayStatus(v); const done = ["zatwierdzony", "zaplanowany"].includes(v.status);
+      let kind = null; let reason = "";
+      if (v.date < t) { kind = "late"; reason = done ? `Opublikuj i potwierdź. ${where(v)}` : `Termin minął, status: ${RL().statusMeta(v.status).label}. ${where(v)}`; }
+      else if (v.status === "poprawki" && v.date <= we) { kind = "fixes"; reason = `Nanieś poprawki przełożonego. ${where(v)}`; }
+      else if (done && v.date <= we) { kind = "ready"; reason = ds === "do_opublikowania" ? `Opublikuj i potwierdź. ${where(v)}` : `Gotowy do publikacji. ${where(v)}`; }
+      else if (v.status === "do_akceptacji") { kind = "approval"; reason = role === "przelozony" ? `Zatwierdź albo zgłoś poprawki. ${where(v)}` : `Czeka na akceptację. ${where(v)}`; }
+      else if (v.date >= t && v.date <= we && RL().issues(v).length) { kind = "issues"; const miss = RL().issues(v).join(", "); reason = `${miss.charAt(0).toUpperCase()}${miss.slice(1)}. ${where(v)}`; }
+      if (kind) items.push({ kind, title: R().postTitle(v), reason, route: `post/${v.postId}?v=${v.id}`, date: v.date });
+    });
+    R().list("tasks", (k) => k.due && k.due <= t && !["zakonczone", "anulowane"].includes(k.status) && RL().brandMatch(k.brandId))
+      .forEach((k) => items.push({ kind: "task", title: k.title, reason: `Termin ${D.fmtDay(k.due)}${k.due < t ? " (po terminie)" : ""}`, route: `workspace/zadania?task=${k.id}`, date: k.due }));
+    const cf = RL().channelFilter(); let gaps = 0;
+    R().list("channels", (c) => c.active !== false && (!cf || c.id === cf)).forEach((ch) => {
+      const r = ch.rhythm || {};
+      (r.feedDays || []).forEach((dw) => {
+        const day = D.addDays(ws, (dw + 6) % 7); if (day < t || gaps >= 3) return;
+        if (!R().list("versions", (v) => v.channelId === ch.id && v.date === day && v.status !== "anulowany" && RL().isFeed(v)).length) {
+          gaps++; items.push({ kind: "gap", title: ch.name, reason: `Brak posta w ${D.DOW_ACC[dw]}, ${D.fmtDay(day)}`, route: "studio/harmonogram", date: day });
+        }
+      });
+    });
+    return items.sort((a, b) => TODO_PRIO[a.kind] - TODO_PRIO[b.kind] || (a.date || "").localeCompare(b.date || ""));
+  }
+  const todoRow = (it) => `<li><button class="todo todo-${it.kind}" data-route="${esc(it.route)}"><span class="todo-chip">${esc(TODO_LABEL[it.kind])}</span><span class="todo-t"><b>${esc(it.title)}</b><small>${esc(it.reason)}</small></span><span class="todo-go" aria-hidden="true">Otwórz →</span></button></li>`;
+
   CT.views["dashboard/start"] = () => {
     const t = D.today(); const ws = D.weekStart(t); const we = D.addDays(ws, 6);
-    const A = RL().weekAlerts();
-    const cf = RL().channelFilter();
+    const cf = RL().channelFilter(); const role = R().role();
     const filterLabel = cf ? R().chName(cf) : "Wszystkie kanały";
     const inF = (v) => RL().inFilter(v);
-    const next = R().list("versions", (v) => inF(v) && !RL().FINAL.includes(v.status) && v.date >= t && v.date <= D.addDays(t, 7))
-      .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
-    const waiting = R().list("versions", (v) => inF(v) && v.status === "do_akceptacji");
-    const tasksToday = R().list("tasks", (k) => k.due && k.due <= t && !["zakonczone", "anulowane"].includes(k.status) && RL().brandMatch(k.brandId));
-    const recent = R().list("versions", inF).flatMap((v) => (v.history || []).map((e) => ({ e, v })))
-      .sort((a, b) => b.e.at.localeCompare(a.e.at)).slice(0, 8);
+    const live = R().list("versions", (v) => inF(v) && !RL().FINAL.includes(v.status));
+    const todo = dashTodo(t, ws, we);
+
+    /* Zdanie podsumowania liczone z danych. */
+    const nLate = live.filter((v) => v.date < t).length;
+    const nToday = live.filter((v) => v.date === t && ["zatwierdzony", "zaplanowany"].includes(v.status)).length;
+    const nWait = live.filter((v) => v.status === "do_akceptacji").length;
+    const nFix = live.filter((v) => v.status === "poprawki").length;
+    const parts = [];
+    if (nLate) parts.push(`${nLate} po terminie`);
+    if (nToday) parts.push(`${nToday} do publikacji dziś`);
+    if (nWait) parts.push(role === "przelozony" ? `${nWait} czeka na Twoją decyzję` : `${nWait} do akceptacji`);
+    if (nFix) parts.push(`${nFix} do poprawy`);
+    const summary = parts.length ? `Dziś: ${parts.join(", ")}.`
+      : todo.length ? `Nic pilnego, ale na liście czeka jeszcze ${todo.length} ${U.plural(todo.length, "pozycja", "pozycje", "pozycji")}.` : "Wszystko na czas. Nic nie wymaga reakcji.";
+    const hour = Number(D.nowTime().slice(0, 2)); const greet = hour >= 5 && hour < 18 ? "Dzień dobry" : "Dobry wieczór";
+    const quick = [["post", "Dodaj post"], ["topic", "Temat"], ["video", "Wideo"], ["task", "Zadanie"], ["campaign", "Kampania"]]
+      .map(([k, l], i) => `<button class="btn ${i ? "ghost small" : "primary"}" data-act="quick-${k}">${i ? "+ " : ""}${l}</button>`).join("");
+
+    const top = todo.slice(0, 5); const more = todo.slice(5);
+    const todoCard = `<section class="card"><div class="cardhead"><h2>Do zrobienia teraz <span class="cnt${todo.length ? " hot" : ""}">${todo.length}</span></h2></div>
+      ${todo.length ? `<ul class="todolist">${top.map(todoRow).join("")}</ul>${more.length ? `<details class="todomore"><summary>Pokaż wszystkie (${todo.length})</summary><ul class="todolist">${more.map(todoRow).join("")}</ul></details>` : ""}`
+        : `<p class="todoempty">Nic nie wymaga reakcji. Plan na ten tydzień jest pod kontrolą.</p>`}</section>`;
+
+    /* Najlepszy post ostatnich 30 dni (z Analityki) i mix filarów. */
+    const from30 = D.addDays(t, -29);
+    const recs = R().list("versions", (v) => inF(v) && v.status === "opublikowany" && v.date >= from30 && v.date <= t)
+      .map((v) => ({ v, r: R().list("analytics", (a) => a.versionId === v.id)[0] })).filter((x) => x.r && Number(x.r.reach) > 0).map((x) => ({ ...x, er: RL().engagement(x.r) })).sort((a, b) => b.er - a.er);
+    const avgReach = recs.length ? recs.reduce((s, x) => s + Number(x.r.reach), 0) / recs.length : 0;
+    const best = recs[0];
+    const bestCard = `<section class="card"><div class="cardhead"><h2>Najlepszy post (30 dni)</h2></div>${best ? (() => { const a = R().get("assets", (best.v.assetIds || [])[0]);
+      return `<button class="bestpost" data-route="post/${best.v.postId}?v=${best.v.id}"><span class="bp-th">${a ? U.thumb(a) : esc((R().postTitle(best.v) || "?").charAt(0).toUpperCase())}</span><span class="bp-tx"><b>${esc(R().postTitle(best.v))}</b><small>${esc(R().chName(best.v.channelId))}, ${D.fmtDay(best.v.date)}</small><span class="bp-n"><i>${U.pct(best.er)}</i> zaangażowania, zasięg ${U.num(best.r.reach)}</span>${Number(best.r.reach) < avgReach * 0.5 ? `<small class="warntext">Mały zasięg: wynik może być przypadkowy.</small>` : ""}</span></button>
+        <p class="small"><a href="#/performance/analityka">Zobacz Analitykę i objaśnienia →</a></p>`; })()
+      : `<p class="muted small">Wpisz wyniki opublikowanych postów w Analityce, a tu pojawi się najlepszy z nich.</p><p class="small"><a href="#/performance/analityka">Przejdź do Analityki →</a></p>`}</section>`;
+    const planned30 = R().list("versions", (v) => inF(v) && v.status !== "anulowany" && v.date >= from30 && v.date <= t);
+    const mixCard = `<section class="card"><h2>Mix filarów (30 dni)</h2>${U.pillarMix ? U.pillarMix(planned30) : ""}</section>`;
+
+    /* Pasek tygodnia: kto i kiedy publikuje, puste dni widoczne. */
+    const chs = R().list("channels", (c) => c.active !== false && (!cf || c.id === cf));
+    const days = Array.from({ length: 7 }, (_, i) => D.addDays(ws, i));
+    const dayCell = (d) => {
+      const vs = R().list("versions", (v) => inF(v) && v.date === d && v.status !== "anulowany").sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+      const gap = d >= t && chs.some((ch) => ((ch.rhythm || {}).feedDays || []).includes(D.dow(d)) && !vs.some((v) => v.channelId === ch.id && RL().isFeed(v)));
+      const mini = vs.slice(0, 3).map((v) => { const ch = R().get("channels", v.channelId) || {}; const a = R().get("assets", (v.assetIds || [])[0]);
+        return `<span class="wkp" style="--c:${ch.color || "var(--wine)"}" title="${esc(R().postTitle(v))}: ${esc(R().chName(v.channelId))}, ${esc(RL().statusMeta(RL().displayStatus(v)).label)}"><span class="wkp-th">${a ? U.thumb(a) : esc((R().postTitle(v) || "?").charAt(0).toUpperCase())}</span>${U.dot(RL().displayStatus(v))}</span>`; }).join("");
+      return `<button class="wkd${d === t ? " today" : ""}${d < t ? " past" : ""}" data-act="dash-week" data-day="${d}" aria-label="${esc(FEED_DOW(d))} ${D.fmtDay(d)}: ${vs.length} ${U.plural(vs.length, "post", "posty", "postów")}"><span class="wkd-h"><small>${FEED_DOW(d)}</small><b>${Number(d.slice(8))}</b></span><span class="wkd-b">${mini}${vs.length > 3 ? `<span class="wkd-more">+${vs.length - 3}</span>` : ""}${!vs.length ? `<span class="wkd-empty">${gap ? "brak posta" : "–"}</span>` : ""}</span>${gap && vs.length ? `<span class="warnflag" title="Luka w rytmie kanału">!</span>` : ""}</button>`;
+    };
+    const weekCard = `<section class="card"><div class="cardhead"><h2>Ten tydzień</h2><span class="muted small">${D.fmtDay(ws)} – ${D.fmtFull(we)}. Kliknij dzień, żeby otworzyć Harmonogram.</span></div><div class="wkstrip">${days.map(dayCell).join("")}</div></section>`;
+
+    /* Najbliższe publikacje: karty z miniaturą. */
+    const next = live.filter((v) => v.date >= t && v.date <= D.addDays(t, 7)).sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || ""))).slice(0, 4);
+    const nextCards = next.length ? `<div class="upcs">${next.map((v) => { const ch = R().get("channels", v.channelId) || {}; const a = R().get("assets", (v.assetIds || [])[0]); const ds = RL().displayStatus(v);
+      return `<button class="upc" style="--c:${ch.color || "var(--wine)"}" data-route="post/${v.postId}?v=${v.id}"><span class="upc-th">${a ? U.thumb(a) : esc((R().postTitle(v) || "?").charAt(0).toUpperCase())}</span><span class="upc-d">${FEED_DOW(v.date)}, ${D.fmtDay(v.date)}${v.time ? " · " + esc(v.time) : ""}</span><b>${esc(R().postTitle(v))}</b><span class="upc-m">${U.mono(ch, "sm")}${U.badge(ds)}</span></button>`; }).join("")}</div>`
+      : `<p class="muted small">Brak publikacji w najbliższych 7 dniach.</p>`;
+    const nextCard = `<section class="card"><div class="cardhead"><h2>Najbliższe publikacje</h2><a class="small" href="#/studio/harmonogram">Cały Harmonogram →</a></div>${nextCards}</section>`;
+
+    /* Szczegóły niżej, zwinięte. */
+    const recent = R().list("versions", inF).flatMap((v) => (v.history || []).map((e) => ({ e, v }))).sort((a, b) => b.e.at.localeCompare(a.e.at)).slice(0, 8);
     const ym = t.slice(0, 7);
-    const chs = R().list("channels", (c) => c.active !== false && (!cf || c.id === cf)).sort((a, b) => (a.order || 0) - (b.order || 0));
-    const vItem = (v, extra) => ({ status: RL().displayStatus(v), title: R().postTitle(v), sub: `${R().chName(v.channelId)}, ${D.fmtDay(v.date)}${v.time ? " " + v.time : ""}${extra ? ". " + extra : ""}`, route: `post/${v.postId}?v=${v.id}` });
-    const group = (title, items, empty, cls = "") => `<div class="wk ${cls}"><h3>${esc(title)}<span class="cnt">${items.length}</span></h3>${U.listItems(items.slice(0, 8), empty)}${items.length > 8 ? `<p class="muted small">i ${items.length - 8} więcej</p>` : ""}</div>`;
-    const gaps = A.gaps.map((g) => ({ status: null, title: g.title, sub: g.sub, route: g.route }));
-    const quick = [["post", "Dodaj post"], ["topic", "Dodaj temat"], ["video", "Dodaj wideo"], ["task", "Dodaj zadanie"], ["campaign", "Dodaj kampanię"]]
-      .map(([k, l], i) => `<button class="btn ${i ? "" : "primary"}" data-act="quick-${k}">${l}</button>`).join("");
+    const extras = `<details class="card dextra"><summary><h2>Ostatnie zmiany</h2></summary>${recent.length ? `<ul class="alist">${recent.map(({ e, v }) => `<li><button data-route="post/${v.postId}?v=${v.id}"><i class="dot task"></i><span><b>${esc(R().postTitle(v))}</b><small>${esc(e.desc)}, ${esc(e.user)}, ${D.fmtTs(e.at)}</small></span></button></li>`).join("")}</ul>` : `<p class="muted small">Brak zmian.</p>`}</details>
+      <details class="card dextra"><summary><h2>Aktywność kanałów</h2></summary><p class="muted small">${D.monthLabel(ym)}</p>
+        <table class="tbl compact"><thead><tr><th>Kanał</th><th>Plan</th><th>Opublikowane</th><th>Wymaga uwagi</th></tr></thead><tbody>
+        ${chs.sort((a, b) => (a.order || 0) - (b.order || 0)).map((c) => { const vs = R().list("versions", (v) => v.channelId === c.id && v.date.startsWith(ym) && v.status !== "anulowany");
+          return `<tr><td>${U.chTag(c)}</td><td>${vs.length}</td><td>${vs.filter((v) => v.status === "opublikowany").length}</td><td>${R().list("versions", (v) => v.channelId === c.id && RL().needsAttention(v)).length}</td></tr>`; }).join("")}
+        </tbody></table></details>`;
 
     return `<section class="dash-hero">
-        <h1 class="display">Centrum treści social media</h1>
+        <h1 class="dash-title">${greet}</h1>
+        <p class="dash-sum">${esc(summary)}</p>
         <p class="dash-meta">Tydzień ${D.fmtDay(ws)} – ${D.fmtFull(we)} <span class="sep"></span> Filtr: <b>${esc(filterLabel)}</b></p>
         <div class="quick">${quick}</div>
       </section>
+      ${howto()}
       ${dashTiles()}
-      <div class="dash-grid">
-        <section class="card week">
-          <h2>W tym tygodniu</h2>
-          ${group("Opóźnienia", A.late, "Brak opóźnień.", "late")}
-          ${group("Do publikacji", A.ready, "Brak zatwierdzonych postów na ten tydzień.")}
-          ${group("Wymaga uwagi", A.attention, "Nic nie wymaga uwagi.")}
-          ${group("Luki w rytmie", gaps, "Rytm publikacji zachowany.", "gap")}
-        </section>
-        <div class="dash-side">
-          <section class="card"><h2>Najbliższe publikacje</h2>${U.listItems(next.slice(0, 8).map((v) => vItem(v)), "Brak publikacji w najbliższych 7 dniach.")}</section>
-          <section class="card"><h2>Oczekujące akceptacje</h2>${U.listItems(waiting.map((v) => vItem(v)), "Nic nie czeka na akceptację.")}</section>
-          <section class="card"><h2>Zadania na dziś</h2>${U.listItems(tasksToday.map((k) => ({ status: null, title: k.title, sub: `${U.label(CT.config.taskStatuses, k.status)}, termin ${D.fmtDay(k.due)}`, route: `workspace/zadania?task=${k.id}` })), "Brak zadań na dziś.")}</section>
-          <section class="card"><h2>Ostatnie zmiany</h2>${recent.length ? `<ul class="alist">${recent.map(({ e, v }) => `<li><button data-route="post/${v.postId}?v=${v.id}"><i class="dot task"></i><span><b>${esc(R().postTitle(v))}</b><small>${esc(e.desc)}, ${esc(e.user)}, ${D.fmtTs(e.at)}</small></span></button></li>`).join("")}</ul>` : `<p class="muted small">Brak zmian.</p>`}</section>
-          <section class="card"><h2>Aktywność kanałów</h2><p class="muted small">${D.monthLabel(ym)}</p>
-            <table class="tbl compact"><thead><tr><th>Kanał</th><th>Plan</th><th>Opubl.</th><th>Uwaga</th></tr></thead><tbody>
-            ${chs.map((c) => { const vs = R().list("versions", (v) => v.channelId === c.id && v.date.startsWith(ym) && v.status !== "anulowany");
-              return `<tr><td>${U.chTag(c)}</td><td>${vs.length}</td><td>${vs.filter((v) => v.status === "opublikowany").length}</td><td>${R().list("versions", (v) => v.channelId === c.id && RL().needsAttention(v)).length}</td></tr>`; }).join("")}
-            </tbody></table></section>
-        </div>
-      </div>`;
+      <div class="dash2"><div>${todoCard}</div><div class="dash2-side">${bestCard}${mixCard}</div></div>
+      ${weekCard}${nextCard}${extras}`;
   };
+  CT.actions["dash-week"] = (el) => { const s = U.state; s.calMode = "week"; s.calWeek = D.weekStart(el.dataset.day); s.calStatus = ""; CT.go("studio/harmonogram"); };
 
   function dashTiles() {
     const t = D.today(); const ws = D.weekStart(t); const we = D.addDays(ws, 6);
@@ -62,10 +134,10 @@
     const pubIn = (a, b) => vs.filter((v) => v.status === "opublikowany" && v.date >= a && v.date <= b).length;
     const pw = pubIn(ws, we); const ppw = pubIn(D.addDays(ws, -7), D.addDays(ws, -1));
     return `<div class="ptiles dash">
-      ${U.tile({ tone: "pink", key: "late", label: "Po terminie", value: late, sub: late ? "wymagają reakcji" : "wszystko na czas" })}
-      ${U.tile({ tone: "sage", key: "ready", label: "Do publikacji w tym tygodniu", value: ready, sub: "zatwierdzone i zaplanowane" })}
-      ${U.tile({ tone: "sand", key: "approvals", label: "Czeka na akceptację", value: wait, sub: R().role() === "przelozony" ? "czeka na Twoją decyzję" : "u przełożonego" })}
-      ${U.tile({ tone: "lilac", key: "archive", label: "Opublikowane w tym tygodniu", value: pw, sub: U.delta(pw, ppw, "poprzedni tydzień") })}
+      ${U.tile({ tone: "pink", key: "late", label: "Po terminie", value: late, sub: late ? "wymagają reakcji" : "wszystko na czas", chip: false })}
+      ${U.tile({ tone: "sage", key: "ready", label: "Do publikacji", value: ready, sub: "w tym tygodniu", chip: false })}
+      ${U.tile({ tone: "sand", key: "approvals", label: "Do akceptacji", value: wait, sub: R().role() === "przelozony" ? "czeka na Ciebie" : "u przełożonego", chip: false })}
+      ${U.tile({ tone: "lilac", key: "archive", label: "Opublikowane", value: pw, sub: U.delta(pw, ppw, "poprzedni tydzień"), chip: false })}
     </div>`;
   }
 
