@@ -4,7 +4,7 @@ CT.mockData = {
   defaultSettings() {
     return {
       role: "smm",
-      railCollapsed: false,
+      railCollapsed: false, hideHowto: false,
       users: { smm: "Social Media Manager", przelozony: "Przełożony" },
       statusOverrides: {},
       videoStatuses: CT.config.defaultVideoStatuses.slice(),

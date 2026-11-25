@@ -87,7 +87,9 @@ CT.views = {};
     for (const el of root.querySelectorAll("[data-asset-src]:not([data-h])")) {
       el.setAttribute("data-h", "1");
       const a = R().get("assets", el.getAttribute("data-asset-src"));
-      if (!a || !a.blobKey) continue;
+      if (!a) continue;
+      if (a.src) { el.src = a.src; continue; } /* materiał ze statycznego pliku (np. wersja demonstracyjna), bez IndexedDB */
+      if (!a.blobKey) continue;
       try { const u = await CT.files.url(a.blobKey); if (u) el.src = u; } catch (e) { el.replaceWith(Object.assign(document.createElement("span"), { className: "filetype", textContent: "brak pliku" })); }
     }
   };

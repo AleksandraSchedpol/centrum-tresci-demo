@@ -19,6 +19,8 @@
     return { parts, q: new URLSearchParams(q || ""), path };
   }
   function resolve(r) {
+    /* stary adres Wideo Content (przed przeniesieniem do osobnego modułu) */
+    if (r.parts[0] === "studio" && r.parts[1] === "wideo") r = { ...r, parts: ["wideo", "produkcja"] };
     if (r.parts[0] === "post") return { group: "studio", tab: null, key: "post" };
     const g = CT.config.nav.find((n) => n.id === r.parts[0]) || CT.config.nav[0];
     const tab = g.tabs.find((t) => t[0] === r.parts[1]) ? r.parts[1] : g.tabs[0][0];
@@ -54,7 +56,7 @@
     add("Bank tematów", R().list("topics", (t) => m(t.title, t.description, t.hook, t.notes)).map((t) => ({ label: t.title, sub: U.label(CT.config.topicStatuses, t.status), go: () => { CT.go("studio/tematy"); CT.forms.topic(t); } })));
     add("Materiały", R().list("assets", (a) => m(a.name, a.description, (a.tags || []).join(" "), a.license)).map((a) => ({ label: a.name, sub: [a.type, a.width ? `${a.width}×${a.height}` : ""].filter(Boolean).join(", "), go: () => { CT.go("studio/biblioteka"); CT.actions["asset-open"]({ dataset: { id: a.id } }); } })));
     add("Newslettery", R().list("newsletters", (n) => m(n.title, n.subject, n.preheader, n.content, n.notes)).map((n) => ({ label: n.title, sub: `${(R().get("nlLists", n.listId) || {}).name || "Newsletter"}, ${n.date ? D.fmtFull(n.date) : "bez daty"}`, go: () => CT.go(`newsletter/plan?nl=${n.id}`) })));
-    add("Wideo", R().list("videos", (x) => m(x.title, x.hook, x.script, x.prompt)).map((x) => ({ label: x.title, sub: `${x.track === "ai" ? "AI Video" : "In-house"}, ${x.status}`, go: () => { CT.go("studio/wideo"); CT.forms.video(x); } })));
+    add("Wideo", R().list("videos", (x) => m(x.title, x.hook, x.script, x.prompt)).map((x) => ({ label: x.title, sub: `${x.track === "ai" ? "AI Video" : "In-house"}, ${x.status}`, go: () => { CT.go("wideo/produkcja"); CT.forms.video(x); } })));
     add("Zadania", R().list("tasks", (k) => m(k.title, k.description)).map((k) => ({ label: k.title, sub: U.label(CT.config.taskStatuses, k.status), go: () => { CT.go("workspace/zadania"); CT.forms.task(k); } })));
     add("Kampanie", R().list("campaigns", (c) => m(c.name, c.goal, c.description)).map((c) => ({ label: c.name, sub: U.label(CT.config.campaignStatuses, c.status), go: () => { CT.go("performance/reklamy"); CT.forms.campaign(c); } })));
     add("Okazje", R().list("events", (e) => m(e.title, e.notes)).map((e) => ({ label: e.title, sub: D.fmtFull(e.date), go: () => CT.go("brand/okazje") })));
@@ -113,6 +115,16 @@
       <div class="rrole"><span class="rhead">Widok roli (demo)</span><div class="segs">${Object.keys(CT.config.roles).map((r) => `<button class="seg${s.role === r ? " on" : ""}" data-act="set-role" data-role="${r}" title="${esc(R().userLabel(r))}">${r === "smm" ? "SMM" : "Przełożony"}</button>`).join("")}</div></div>`;
   }
 
+  /* Wysokość przyklejonego nagłówka (pasek modułów + zakładki) zmienia się, gdy moduły zawijają się do drugiego rzędu. */
+  function setChromeH() {
+    const t = document.getElementById("topbar"), s = document.getElementById("subtabs"); if (!t || !s) return;
+    const root = document.documentElement.style;
+    root.setProperty("--topbar-h", t.offsetHeight + "px");
+    root.setProperty("--chrome-h", (t.offsetHeight + s.offsetHeight) + "px");
+  }
+  window.addEventListener("resize", setChromeH);
+  /* Wysokość nagłówka zmienia się też bez zmiany okna (czcionki, zawijanie modułów): obserwujemy oba paski. */
+  if ("ResizeObserver" in window) { const ro = new ResizeObserver(setChromeH); ["topbar", "subtabs"].forEach((id) => { const el = document.getElementById(id); if (el) ro.observe(el); }); }
   let lastKey = "";
   CT.render = () => {
     const r = parseRoute(); const cur = resolve(r);
@@ -145,6 +157,7 @@
       clearTimeout(CT._enterT); CT._enterT = setTimeout(() => view.classList.remove("enter"), 700);
     }
     if (focusFilter) { const el = view.querySelector(`[data-filter="${focusFilter.f}"]`); if (el) { el.focus(); try { if (focusFilter.s != null) el.setSelectionRange(focusFilter.s, focusFilter.s); } catch (e) {} } }
+    setChromeH();
     document.title = `${(CT.config.nav.find((g) => g.id === cur.group) || {}).label || "Centrum treści"}: Centrum treści social media`;
   };
 

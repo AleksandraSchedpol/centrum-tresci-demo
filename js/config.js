@@ -15,8 +15,9 @@ CT.config = {
   nav: [
     { id: "dashboard", label: "Dashboard", tabs: [["start", "Przegląd"], ["briefing", "Poranny briefing"]] },
     { id: "studio", label: "Content Studio", tabs: [
-      ["harmonogram", "Harmonogram"], ["feed", "Podgląd feedu"], ["tematy", "Bank tematów"],
-      ["posty", "Karty postów"], ["archiwum", "Archiwum"], ["biblioteka", "Biblioteka materiałów"], ["wideo", "Wideo Content"] ] },
+      ["harmonogram", "Harmonogram"], ["posty", "Karty postów"], ["feed", "Podgląd feedu"],
+      ["biblioteka", "Biblioteka materiałów"], ["tematy", "Bank tematów"], ["archiwum", "Archiwum"] ] },
+    { id: "wideo", label: "Wideo Content", tabs: [["produkcja", "Produkcja wideo"]] },
     { id: "newsletter", label: "Newslettery", tabs: [
       ["plan", "Plan wysyłek"], ["tematy", "Bank tematów"], ["grafiki", "Grafiki"], ["statystyki", "Statystyki"], ["listy", "Listy"] ] },
     { id: "brand", label: "Brand Center", tabs: [

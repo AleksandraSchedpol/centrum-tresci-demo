@@ -134,9 +134,32 @@
     const pass = (v) => !st.calStatus
       || (st.calStatus === "ready" ? ["zatwierdzony", "zaplanowany", "do_opublikowania"].includes(ds(v)) && v.date >= D.today()
       : st.calStatus === "late" ? RL().isLate(v) : ds(v) === st.calStatus);
-    return R().list("versions", (v) => RL().inFilter(v) && pass(v)
+    /* Anulowane zostają w historii i w danych. W kalendarzu są domyślnie ukryte, przełącznik pokazuje je przekreślone. */
+    const showCancelled = st.calShowCancelled || st.calStatus === "anulowany";
+    return R().list("versions", (v) => RL().inFilter(v) && pass(v) && (showCancelled || v.status !== "anulowany")
       && (!st.calBrand || (R().get("channels", v.channelId) || {}).brandId === st.calBrand));
   }
+  /* Podsumowanie wybranego miesiąca: te same dane co kalendarz, bez osobnych liczników. */
+  function monthSummary(ym) {
+    const vs = R().list("versions", (v) => RL().inFilter(v) && v.status !== "anulowany" && v.date.startsWith(ym));
+    const approved = vs.filter((v) => ["zatwierdzony", "zaplanowany", "opublikowany"].includes(v.status)).length;
+    const review = vs.filter((v) => ["do_akceptacji", "poprawki"].includes(v.status)).length;
+    const cell = (n, l) => `<div class="msum-c"><b>${n}</b><span>${esc(l)}</span></div>`;
+    return `<section class="msum" aria-label="Podsumowanie miesiąca"><h2>${esc(D.monthLabel(ym))}</h2>
+      <div class="msum-n">${cell(vs.length, U.plural(vs.length, "post w miesiącu", "posty w miesiącu", "postów w miesiącu"))}${cell(approved, "zatwierdzonych")}${cell(review, "do przeglądu")}</div></section>`;
+  }
+  /* Karta „Jak to działa”: zwijana, stan zapamiętany w ustawieniach. */
+  function howto() {
+    if (R().settings().hideHowto) return "";
+    const s = (n, t, d) => `<li><b>${n}</b><span><strong>${esc(t)}</strong>${esc(d)}</span></li>`;
+    return `<section class="card howto"><div class="cardhead"><h2>Jak działa ta strona</h2><button class="btn small ghost" data-act="howto-hide">Ukryj</button></div>
+      <ol>${s("1", "Planujesz. ", "Dodaj post albo przeciągnij temat z Banku tematów na dzień. Przeciągnięcie posta na inny dzień zmienia termin, a poprzednia i nowa data trafiają do historii.")}
+      ${s("2", "Przełożony akceptuje. ", "Wysyłasz wersję do akceptacji, przełożony zatwierdza albo zgłasza poprawki. Zmiana treści zatwierdzonego posta cofa akceptację.")}
+      ${s("3", "Publikujesz i potwierdzasz. ", "Post publikujesz ręcznie w narzędziu platformy i klikasz OPUBLIKOWANO. Wersja trafia do Archiwum z datą potwierdzenia.")}</ol></section>`;
+  }
+  CT.actions["howto-hide"] = () => R().setSettings({ hideHowto: true });
+  CT.actions["howto-show"] = () => R().setSettings({ hideHowto: false });
+  CT.actions["cal-cancelled"] = (el) => { U.state.calShowCancelled = el.checked; CT.render(); };
   function topicsPanel() {
     const bf = RL().brandFilter();
     const ts = R().list("topics", (t) => (t.targets || ["social"]).includes("social") && t.status !== "wykorzystany" && (!bf || !t.brandId || t.brandId === bf))
@@ -159,6 +182,7 @@
       ${pipe ? "" : `<div class="pager"><button class="icon" data-act="cal-prev" aria-label="Poprzedni okres">‹</button><b>${esc(period)}</b><button class="icon" data-act="cal-next" aria-label="Następny okres">›</button><button class="btn ghost small" data-act="cal-today">Dziś</button></div>`}
       <label class="fsel"><span>Status</span><select data-act-change="cal-status"><option value="">Wszystkie</option>${statusOpts.map(([v, l]) => `<option value="${v}" ${st.calStatus === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>
       ${RL().channelFilter() ? "" : `<label class="fsel"><span>Marka</span><select data-act-change="cal-brand"><option value="">Wszystkie</option>${U.opt.brands().map(([v, l]) => `<option value="${v}" ${st.calBrand === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`}
+      ${pipe ? "" : `<label class="check togglecancel"><input type="checkbox" data-act-change="cal-cancelled" ${st.calShowCancelled || st.calStatus === "anulowany" ? "checked" : ""} ${st.calStatus === "anulowany" ? "disabled" : ""}> Pokaż anulowane</label>`}
     </div>`;
     let body;
     if (pipe) {
@@ -167,7 +191,7 @@
       const anyMonth = ["ready", "late"].includes(st.calStatus);
       const rows = vs.filter((v) => anyMonth || v.date.startsWith(st.calMonth)).sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
       body = rows.length ? `<div class="tblwrap"><table class="tbl"><thead><tr><th>Data</th><th>Godz.</th><th>Temat</th><th>Kanał</th><th>Format</th><th>Status</th><th>Uwagi</th></tr></thead><tbody>
-        ${rows.map((v) => `<tr data-route="post/${v.postId}?v=${v.id}" class="click"><td>${D.fmtDay(v.date)}</td><td>${esc(v.time || "")}</td><td><b>${esc(R().postTitle(v))}</b></td><td>${U.chTag(R().get("channels", v.channelId))}</td><td>${esc(v.format)}</td><td>${U.badge(RL().displayStatus(v))}</td><td class="small">${esc(RL().warnings(v).concat(RL().issues(v)).join(" "))}</td></tr>`).join("")}
+        ${rows.map((v) => `<tr data-route="post/${v.postId}?v=${v.id}" class="click${v.status === "anulowany" ? " cancelled" : ""}"><td>${D.fmtDay(v.date)}</td><td>${esc(v.time || "")}</td><td><b>${esc(R().postTitle(v))}</b></td><td>${U.chTag(R().get("channels", v.channelId))}</td><td>${esc(v.format)}</td><td>${U.badge(RL().displayStatus(v))}</td><td class="small">${esc(RL().warnings(v).concat(RL().issues(v)).join(" "))}</td></tr>`).join("")}
         </tbody></table></div>` : U.empty("Brak postów w tym miesiącu.", `<button class="btn primary" data-act="quick-post">Dodaj post</button>`);
     } else {
       let start, end;
@@ -189,8 +213,9 @@
       body = `<div class="calwrap"><div class="cal ${st.calMode}">${cells}</div></div>
         <div class="legend">${["szkic", "w_przygotowaniu", "do_akceptacji", "poprawki", "zatwierdzony", "zaplanowany", "do_opublikowania", "opublikowany", "opozniony"].map((s) => `<span>${U.dot(s)}${esc(RL().statusMeta(s).label)}</span>`).join("")}<span><b class="warnflag">!</b>Niezgodne z rytmem kanału</span></div>`;
     }
-    return U.head("Harmonogram", "Przeciągnij post na inny dzień, żeby zmienić termin. Każda zmiana trafia do historii z poprzednią i nową datą.", `<button class="btn primary" data-act="quick-post">Dodaj post</button>`)
-      + planTiles() + toolbar + (pipe ? body : `<div class="cal-layout"><div>${body}</div>${topicsPanel()}</div>`);
+    const helpBtn = R().settings().hideHowto ? `<button class="btn ghost" data-act="howto-show">Jak to działa</button>` : "";
+    return U.head("Harmonogram", "Przeciągnij post na inny dzień, żeby zmienić termin. Każda zmiana trafia do historii z poprzednią i nową datą.", `${helpBtn}<button class="btn primary" data-act="quick-post">Dodaj post</button>`)
+      + howto() + planTiles() + (pipe ? "" : monthSummary(st.calMode === "week" ? st.calWeek.slice(0, 7) : st.calMonth)) + toolbar + (pipe ? body : `<div class="cal-layout"><div>${body}</div>${topicsPanel()}</div>`);
   };
 
   /* Kafelki nad Harmonogramem: liczone z danych, klik ustawia widok i filtr. */

@@ -158,7 +158,7 @@
       onSave: (vals) => { if (x) R().update("videos", x.id, vals); else R().add("videos", { ...vals, track: tr }, "vd"); U.toast("Zapisano."); },
       onDelete: x ? () => R().remove("videos", x.id) : null });
   };
-  CT.views["studio/wideo"] = () => {
+  CT.views["wideo/produkcja"] = () => {
     const tr = U.state.videoTrack; const bf = RL().brandFilter();
     const statuses = R().settings().videoStatuses || C.defaultVideoStatuses;
     const col = (track, title) => {

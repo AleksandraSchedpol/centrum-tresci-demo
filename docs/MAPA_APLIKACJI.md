@@ -10,7 +10,8 @@
 | Moduł | Zakładki | Codzienne zastosowanie |
 |---|---|---|
 | Dashboard | Przegląd, Poranny briefing | Start dnia: opóźnienia, do publikacji, wymaga uwagi, luki w rytmie, szybkie akcje |
-| Content Studio | Harmonogram, Podgląd feedu, Bank tematów, Karty postów, Archiwum, Biblioteka materiałów, Wideo Content | Planowanie i produkcja treści |
+| Content Studio | Harmonogram, Karty postów, Podgląd feedu, Biblioteka materiałów, Bank tematów, Archiwum | Planowanie i produkcja treści |
+| Wideo Content | Produkcja wideo | Osobny moduł: pomysły i produkcja wideo (dwa tory) |
 | Newslettery | Plan wysyłek, Bank tematów, Grafiki, Statystyki, Listy | Wydania Newslettera BOK i MailerLite: tematy, planowane daty, grafiki, później wyniki |
 | Brand Center | Księga marek, Filary komunikacji, Biblioteka formatów, Kalendarz okazji, Konkurencja | Wiedza i zasady, do których wracasz przy planowaniu |
 | Workspace | Akceptacje, Zadania, Komentarze, Historia działań, Powiadomienia | Współpraca z przełożonym i organizacja pracy |
@@ -54,6 +55,9 @@ Karta posta (`#/post/...`) otwiera się na pełnym ekranie: po lewej edycja (pos
 13. **Szkice zamiast blokady.** Niezapisane zmiany w karcie posta są szkicem w sessionStorage (osobno post, każda wersja, komentarz). Przejście do innej zakładki nie jest blokowane, szkic wraca. Jeśli rekord zmieniono gdzie indziej, użytkownik wybiera: zachować szkic albo go odrzucić.
 14. **Jedna karta zapisuje naraz.** Gdy inna karta zapisała dane, ta karta wstrzymuje zapis do kliknięcia „Odśwież” (bez automatycznego przeładowania).
 15. **Akceptacja dotyczy kanału.** Zatwierdzenie zapisuje kanał; zmiana kanału cofa wersję do akceptacji. Starsze akceptacje bez zapisanego kanału pozostają ważne.
+16. **Anulowane posty zostają przekreślone.** W Harmonogramie są domyślnie ukryte, przełącznik „Pokaż anulowane” (albo filtr statusu) pokazuje je przekreślone. Historia i dane zostają; usunięcie na stałe to osobna akcja „Usuń post”.
+17. **Wideo Content to osobny moduł** (dawniej zakładka Content Studio). Stary adres #/studio/wideo przekierowuje do nowego.
+18. **Czytelność:** tekst bazowy 16 px, minimum 12 px (poza znaczkami platform), ciemniejszy kolor tekstu pomocniczego. W kalendarzu duże miniatury, podsumowanie miesiąca i zwijana karta „Jak działa ta strona” (stan w ustawieniach: hideHowto).
 11. **Kafelki pastelowe** (róż, szałwia, piasek, liliowy) to jedyne miejsce z kolorowym tłem: reszta interfejsu zostaje w bieli i beżu.
 
 ## Ograniczenia Etapu 1
